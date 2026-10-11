@@ -99,7 +99,7 @@ const recipientReceiptGood = signReceipt(
 const goodDeliveryEvidence: EvidenceBundle = {
   contractId: deliveryContract.contractId,
   policyHash: deliveryContract.policyHash,
-  workerId: "0x9eC8b4b7a1A9B8f4e3D2c1B0A9f8E7d6C5b4A3f2",
+  workerId: "0x9Ec8B4b7A1A9B8f4E3D2c1b0A9f8E7d6C5B4A3F2",
   submittedAt: "2026-01-02T11:05:00.000Z",
   receipts: [pickupReceiptGood, recipientReceiptGood],
   geo: [],
@@ -127,7 +127,7 @@ const pickupReceiptForged = signReceipt(
 const forgedDeliveryEvidence: EvidenceBundle = {
   contractId: deliveryContract.contractId,
   policyHash: deliveryContract.policyHash,
-  workerId: "0x9eC8b4b7a1A9B8f4e3D2c1B0A9f8E7d6C5b4A3f2",
+  workerId: "0x9Ec8B4b7A1A9B8f4E3D2c1b0A9f8E7d6C5B4A3F2",
   submittedAt: "2026-01-02T11:05:00.000Z",
   receipts: [pickupReceiptForged, recipientReceiptForged],
   geo: [],
@@ -150,7 +150,7 @@ const recipientChallengeConsumed = challenge(
 const replayedDeliveryEvidence: EvidenceBundle = {
   contractId: deliveryContract.contractId,
   policyHash: deliveryContract.policyHash,
-  workerId: "0x9eC8b4b7a1A9B8f4e3D2c1B0A9f8E7d6C5b4A3f2",
+  workerId: "0x9Ec8B4b7A1A9B8f4E3D2c1b0A9f8E7d6C5B4A3F2",
   submittedAt: "2026-01-02T11:05:00.000Z",
   receipts: [pickupReceiptGood, recipientReceiptGood],
   geo: [],
@@ -175,7 +175,7 @@ export const observationContract: Contract = observationCompiled.contract;
 const aiOnlyEvidence: EvidenceBundle = {
   contractId: observationContract.contractId,
   policyHash: observationContract.policyHash,
-  workerId: "0x7A3b5C9d1E2f4A6b8C0d2E4f6A8b0C2d4E6f8A0b",
+  workerId: "0x7A3b5C9d1e2F4A6b8C0D2e4F6A8B0C2d4E6f8A0b",
   submittedAt: "2026-01-02T11:05:00.000Z",
   receipts: [], // no witness signature at all -> crypto branch fails
   geo: [{ lat: 37.0, lon: -122.0, capturedAt: "2026-01-02T11:00:00.000Z" }],

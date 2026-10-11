@@ -102,8 +102,8 @@ export interface TransferAuthorizationTypedData {
  *
  * To re-verify after any redeploy, call `eip712Domain()` on the token.
  */
-const AUSD_EIP712_DOMAIN_NAME = "Agora Dollar";
-const AUSD_EIP712_DOMAIN_VERSION = "1";
+export const AUSD_EIP712_DOMAIN_NAME = "Agora Dollar";
+export const AUSD_EIP712_DOMAIN_VERSION = "1";
 
 /**
  * Build (but do not sign) the EIP-712 typed-data payload for a

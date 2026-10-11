@@ -8,7 +8,7 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const record = getContract(id);
+    const record = await getContract(id);
     return NextResponse.json({
       contract: record.contract,
       state: record.state,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { compileContract } from "@/lib/bps/compile";
 import { createFundedContract, listContracts } from "@/lib/bps/store";
+import { requireAuth } from "@/lib/bps/auth";
 
 const CreateContractSchema = z.object({
   sourceText: z.string().min(1, "sourceText is required"),
@@ -10,7 +11,8 @@ const CreateContractSchema = z.object({
 });
 
 export async function GET() {
-  const summaries = listContracts().map((record) => ({
+  const records = await listContracts();
+  const summaries = records.map((record) => ({
     contractId: record.contract.contractId,
     kind: record.contract.kind,
     state: record.state,
@@ -24,6 +26,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireAuth(req, "agent");
+  if (!auth.ok) return auth.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -48,7 +53,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const record = createFundedContract(result.contract, result.warnings);
+  const record = await createFundedContract(result.contract, result.warnings);
 
   return NextResponse.json(
     {

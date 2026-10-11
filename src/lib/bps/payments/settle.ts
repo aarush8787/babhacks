@@ -10,7 +10,7 @@
 import type { Verdict } from "../types";
 import { authorizesSettlement } from "../evaluate";
 import { getSettlementConfig } from "./config";
-import { signTransferAuthorization } from "./ausd";
+import { signTransferAuthorization, AUSD_EIP712_DOMAIN_NAME, AUSD_EIP712_DOMAIN_VERSION } from "./ausd";
 import { buildPaymentHeader, settleViaFacilitator, type PaymentRequirements } from "./x402";
 
 export interface SettleContractInput {
@@ -61,19 +61,19 @@ export type SettleContractResult =
   | FailedResult;
 
 /**
- * In-process idempotency guard, keyed by `idempotencyKey`.
+ * Idempotency for retries is NOT enforced in this module.
  *
- * LIMITATION (documented, not hidden): this is a plain `Map` living in the
- * module's memory. It does NOT survive a process restart, and on serverless
- * platforms (Vercel functions included) a cold start gets a fresh process
- * with an empty map. A retry that lands on a different instance, or after
- * a cold start, is NOT deduplicated by this guard alone. For real money
- * movement this must be backed by a persistent store (e.g. a database row
- * keyed on idempotencyKey written inside the same transaction as the
- * payout) -- this Map is a correctness aid for the common case (retry
- * within one warm instance), not a substitute for that.
+ * It is enforced by the database: `reserveSettlement()` in `store.ts` inserts
+ * a row keyed on `idempotencyKey` into the `settlements` table (primary key
+ * `idempotency_key`), and a partial unique index allows at most one row with
+ * `status = 'settled'` per contract. Whichever caller's INSERT lands first
+ * owns the payout; every concurrent or retried caller -- on this instance,
+ * another instance, or after a cold start -- gets `reserved: false` back
+ * instead of a second attempt at this function. That guard holds across
+ * serverless instances and process restarts, which a module-level `Map`
+ * here never could. Callers of `settleContract()` are expected to call
+ * `reserveSettlement()` first and only proceed on `reserved: true`.
  */
-const settlementLedger = new Map<string, SettleContractResult>();
 
 function defaultIdempotencyKey(contractId: string, evidenceHash: string): string {
   return `${contractId}:${evidenceHash}`;
@@ -99,9 +99,10 @@ function randomNonce(): `0x${string}` {
 export async function settleContract(input: SettleContractInput): Promise<SettleContractResult> {
   const idempotencyKey =
     input.idempotencyKey ?? defaultIdempotencyKey(input.contract.contractId, input.verdict.evidenceHash);
-
-  const prior = settlementLedger.get(idempotencyKey);
-  if (prior) return prior;
+  // idempotencyKey is still computed (and still part of the function's
+  // contract) because callers use it as the key for reserveSettlement() /
+  // recordSettlement() in store.ts, which is what actually enforces
+  // idempotency now. See the module doc comment above.
 
   // Gate 1: only an APPROVED verdict, via the engine's single named
   // authorization function, may move funds. REJECTED and REVIEW both
@@ -115,16 +116,14 @@ export async function settleContract(input: SettleContractInput): Promise<Settle
           : "Verdict is REJECTED: policy was not satisfied. No funds may move.",
       decision: input.verdict.decision,
     };
-    settlementLedger.set(idempotencyKey, result);
     return result;
   }
 
   // Gate 2: refuse, don't throw, if we are not wired to a real signer/RPC/facilitator.
   const config = getSettlementConfig();
   if (config.status === "unconfigured") {
-    // Deliberately NOT cached in settlementLedger: this is an environment
-    // fact, not a settlement outcome, and should be re-checked on retry in
-    // case config becomes available.
+    // This is an environment fact, not a settlement outcome -- re-checked
+    // on every call in case config becomes available before a retry.
     return { status: "unconfigured", missing: config.missing };
   }
 
@@ -157,7 +156,14 @@ export async function settleContract(input: SettleContractInput): Promise<Settle
       resource: `bps://contract/${input.contract.contractId}`,
       description: `BPS payout for contract ${input.contract.contractId}`,
       maxTimeoutSeconds: 60,
-      extra: { name: "AUSD", version: "2" },
+      // MUST match the domain we actually sign with, byte for byte.
+      //
+      // The facilitator rebuilds the EIP-712 digest from these values to verify
+      // our signature. When this said {"AUSD","2"} while ausd.ts signed with
+      // {"Agora Dollar","1"}, the facilitator derived a different digest and
+      // rejected every authorization with `invalid_exact_evm_signature`.
+      // Importing the constants makes divergence impossible.
+      extra: { name: AUSD_EIP712_DOMAIN_NAME, version: AUSD_EIP712_DOMAIN_VERSION },
     };
 
     const header = buildPaymentHeader(requirements, signed);
@@ -168,7 +174,6 @@ export async function settleContract(input: SettleContractInput): Promise<Settle
         status: "failed",
         error: settlement.error ?? "facilitator settlement failed with no error detail",
       };
-      settlementLedger.set(idempotencyKey, result);
       return result;
     }
 
@@ -177,11 +182,9 @@ export async function settleContract(input: SettleContractInput): Promise<Settle
       txHash: settlement.txHash,
       explorerUrl: `https://sepolia.basescan.org/tx/${settlement.txHash}`,
     };
-    settlementLedger.set(idempotencyKey, result);
     return result;
   } catch (err) {
     const result: FailedResult = { status: "failed", error: (err as Error).message };
-    settlementLedger.set(idempotencyKey, result);
     return result;
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getAddress } from "viem";
 import { hashCanonical } from "@/lib/bps/canonical";
 import { evaluate } from "@/lib/bps/evaluate";
 import {
@@ -11,9 +12,12 @@ import {
   LifecycleError,
   NotFoundError,
   latestVerdict,
+  getVerdictByEvidenceHash,
+  reconcileToVerdict,
   recordVerdict,
   submitEvidence,
 } from "@/lib/bps/store";
+import { requireAuth } from "@/lib/bps/auth";
 import type { EvidenceBundle } from "@/lib/bps/types";
 
 const ROLES = ["worker", "pickup", "recipient", "witness"] as const;
@@ -51,7 +55,23 @@ const AiAssertionSchema = z.object({
  */
 const EvmAddressSchema = z
   .string()
-  .regex(/^0x[0-9a-fA-F]{40}$/, "workerId must be a 20-byte hex EVM address (the AUSD payout destination)");
+  .regex(/^0x[0-9a-fA-F]{40}$/, "workerId must be a 20-byte hex EVM address (the AUSD payout destination)")
+  // Reject a bad EIP-55 checksum here rather than letting viem throw at signing
+  // time. A mixed-case address whose checksum does not verify is usually a
+  // transcription error, and catching it now means the worker learns before
+  // doing the job -- not after the verdict, when the payout fails.
+  .refine(
+    (a) => {
+      const hasMixedCase = a !== a.toLowerCase() && a !== a.toUpperCase();
+      if (!hasMixedCase) return true;
+      try {
+        return getAddress(a) === a;
+      } catch {
+        return false;
+      }
+    },
+    { message: "workerId has an invalid EIP-55 checksum; send it all-lowercase or correctly checksummed" },
+  );
 
 const EvidenceBundleSchema = z.object({
   // contractId is taken from the URL, not trusted from the body.
@@ -71,6 +91,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+
+  const auth = await requireAuth(req, "worker");
+  if (!auth.ok) return auth.response;
 
   let body: unknown;
   try {
@@ -94,16 +117,21 @@ export async function POST(
     contractId: id,
   };
 
+  const evidenceHash = hashCanonical(evidence);
+
   try {
-    const existing = getContract(id);
+    const existing = await getContract(id);
 
     // Identical evidence replays to the stored verdict instead of 409-ing on the
     // lifecycle guard. This is not a weakening of the state machine: the engine is
     // deterministic, so re-evaluating the same bundle against the same policy can
     // only ever yield the same decision. It makes the verdict endpoint idempotent
     // and lets a reviewer re-run a scenario without resetting the contract.
-    const prior = latestVerdict(existing);
-    if (prior && prior.evidenceHash === hashCanonical(evidence)) {
+    const prior = await getVerdictByEvidenceHash(id, evidenceHash);
+    if (prior && prior.evidenceHash === evidenceHash) {
+      // Keep contract state in agreement with the verdict we are handing back;
+      // a later, different submission may have moved it elsewhere.
+      await reconcileToVerdict(id, prior);
       return NextResponse.json({ verdict: prior, replayed: true }, { status: 200 });
     }
 
@@ -111,27 +139,29 @@ export async function POST(
     // flows that skipped an explicit challenge round (e.g. policies with no
     // signature predicates).
     if (existing.state === "FUNDED") {
-      acceptContract(id, evidence.workerId);
+      await acceptContract(id, evidence.workerId);
     }
 
-    const record = submitEvidence(id, evidence);
+    const record = await submitEvidence(id, evidence, evidenceHash);
+
+    const priorArtifactHashes = await getPriorArtifactHashes(id, evidence.artifactHashes);
 
     const verdict = evaluate(record.contract, {
       evidence,
       issuedChallenges: record.challenges,
       deadline: record.contract.deadline,
-      priorArtifactHashes: getPriorArtifactHashes(),
+      priorArtifactHashes,
     });
 
     // Consume every nonce this evidence bundle cited, regardless of outcome —
     // a spent nonce must never be replayable.
     for (const receipt of evidence.receipts) {
-      consumeChallenge(receipt.nonce);
+      await consumeChallenge(receipt.nonce);
     }
 
-    addSeenArtifactHashes(evidence.artifactHashes);
+    await addSeenArtifactHashes(id, evidence.artifactHashes);
 
-    recordVerdict(id, verdict);
+    await recordVerdict(id, verdict);
 
     return NextResponse.json({ verdict }, { status: 201 });
   } catch (err) {

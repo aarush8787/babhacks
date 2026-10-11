@@ -8,6 +8,7 @@ import {
   LifecycleError,
   NotFoundError,
 } from "@/lib/bps/store";
+import { requireAuth } from "@/lib/bps/auth";
 
 const ROLES = ["worker", "pickup", "recipient", "witness"] as const;
 
@@ -27,6 +28,9 @@ export async function POST(
 ) {
   const { id } = await params;
 
+  const auth = await requireAuth(req, "worker");
+  if (!auth.ok) return auth.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -43,12 +47,12 @@ export async function POST(
   }
 
   try {
-    const existing = getContract(id);
+    const existing = await getContract(id);
     if (existing.state === "FUNDED") {
-      acceptContract(id, parsed.data.workerAddress);
+      await acceptContract(id, parsed.data.workerAddress);
     }
 
-    const challenge = issueChallenge(id, parsed.data.role);
+    const challenge = await issueChallenge(id, parsed.data.role);
     const payload = challengePayload({
       contractId: id,
       nonce: challenge.nonce,

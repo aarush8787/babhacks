@@ -163,12 +163,16 @@ verdict and refuses a second attempt.
 
 We would rather state these than have a judge find them.
 
-- **No durable persistence.** State lives in a server-side in-memory store, so
-  it resets on a serverless cold start. A hackathon-clock decision; the schema
-  boundary is clean enough to swap in Postgres.
-- **Idempotency is in-process.** The double-settlement guard is a `Map` and
-  does not survive a cold start. Production needs it in the database alongside
-  the payout record.
+- **Durable state is opt-in.** With `BPS_DATABASE_URL` set, state lives in
+  Postgres and every concurrency guarantee is a database constraint (see
+  [docs/OPERATIONS.md](docs/OPERATIONS.md)). Without it, BPS runs in
+  `ephemeral` mode and **settlement is refused**, because the double-payment
+  guard cannot exist in process memory. The engine still works; money cannot
+  move.
+- **Auth has an open mode.** With neither `BPS_DATABASE_URL` nor
+  `BPS_BOOTSTRAP_API_KEY` set, the API accepts unauthenticated writes so the
+  public demo works. Any real deployment must set one of them. `/api/health`
+  reports the live `authMode` so this cannot be missed silently.
 - **Pay-after-verification, not escrow.** See the AUSD section above.
 - **Counterparty identity is not pinned.** `distinct_signers` proves two
   different keys signed, not that either belongs to the intended person.

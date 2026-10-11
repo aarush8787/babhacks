@@ -132,14 +132,18 @@ by direct quote**:
 
 ## Limitations (read before treating this as production-ready)
 
-1. **In-memory idempotency only.** `settle.ts`'s `settlementLedger` is a
-   plain `Map` in process memory. It deduplicates retries that land on the
-   same warm process, but a serverless cold start (Vercel functions
-   included) gets a fresh, empty map — a retry after a cold start, or on a
-   different instance, will NOT be caught by this guard and could pay
-   twice. Going to production requires a persistent idempotency store
-   (e.g., a database row for the idempotency key, written atomically with
-   the payout).
+1. ~~**In-memory idempotency only.**~~ RESOLVED: `settle.ts` no longer keeps
+   any in-process ledger. Idempotency is enforced by the database: the
+   caller (`src/app/api/contracts/[id]/settle/route.ts`) calls
+   `reserveSettlement()` in `store.ts`, which inserts a row keyed on the
+   idempotency key into the `settlements` table (`idempotency_key` primary
+   key) before `settleContract()` ever runs, and a partial unique index
+   allows at most one `status = 'settled'` row per contract. That guard
+   holds across serverless instances and cold starts, which a module-level
+   `Map` never could. It is only available in durable mode (`BPS_DATABASE_URL`
+   set) — `reserveSettlement()` throws in ephemeral mode, and the API route
+   refuses to settle before ever calling it (`settlementAllowed()` in
+   `store.ts`).
 2. ~~**EIP-712 domain is assumed.**~~ RESOLVED: read from the contract's
    `eip712Domain()` and verified against its `DOMAIN_SEPARATOR()`. See
    "Confirmed on-chain" above.
@@ -175,6 +179,8 @@ by direct quote**:
   `X-PAYMENT` header construction (client side), and the facilitator
   `/settle` call.
 - `settle.ts` — `settleContract()`, the only entry point. Enforces the
-  `authorizesSettlement` gate, the unconfigured refusal, in-process
-  idempotency, and returns a `settled | refused_unverified | unconfigured | failed`
-  discriminated union.
+  `authorizesSettlement` gate and the unconfigured refusal, and returns a
+  `settled | refused_unverified | unconfigured | failed` discriminated
+  union. Idempotency is the caller's responsibility, via
+  `reserveSettlement()` / `recordSettlement()` in `store.ts` (database-backed,
+  see limitation 1 above).
