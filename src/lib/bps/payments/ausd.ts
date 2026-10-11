@@ -72,15 +72,38 @@ export interface TransferAuthorizationTypedData {
 }
 
 /**
- * NOT CONFIRMED from Agora docs: the exact EIP-712 domain `name`/`version`
- * AUSD's contract reports via `EIP712Domain`. We use the values ERC-3009
- * tokens conventionally expose (and that x402's own spec example uses for
- * USDC: name "USDC", version "2"). A real deployment's `DOMAIN_SEPARATOR`
- * must match exactly or every signature here will fail verification on
- * -chain -- this is a known gap, documented in README.md.
+ * CONFIRMED on-chain against Base Sepolia on 2026-10-11, not assumed.
+ *
+ * The deployed AUSD contract at 0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC
+ * implements ERC-5267, so it reports its own domain via `eip712Domain()`:
+ *
+ *   fields            0x0f
+ *   name              "Agora Dollar"     <- NOT "AUSD"
+ *   version           "1"                <- NOT "2"
+ *   chainId           84532
+ *   verifyingContract 0xa9012a...22dC
+ *   salt              0x00..00
+ *
+ * Recomputing the domain separator from those values reproduces the
+ * contract's own `DOMAIN_SEPARATOR()`:
+ *
+ *   keccak256(abi.encode(
+ *     keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+ *     keccak256("Agora Dollar"), keccak256("1"), 84532, verifyingContract))
+ *   == 0x5a85328c8aae02b57a5bc1fb1848cb2fb9ccbdc204c554a4db199b13fed1e8bb
+ *
+ * The token name is "Agora Dollar" while its ERC-20 `name()` returns "AUSD",
+ * which is why the conventional guess was wrong. An earlier revision used
+ * "AUSD"/"2" and every signature it produced would have failed EIP-712
+ * verification on-chain.
+ *
+ * ERC-3009 support is likewise confirmed: `authorizationState(address,bytes32)`
+ * answers rather than reverting, and `decimals()` returns 6.
+ *
+ * To re-verify after any redeploy, call `eip712Domain()` on the token.
  */
-const AUSD_EIP712_DOMAIN_NAME = "AUSD";
-const AUSD_EIP712_DOMAIN_VERSION = "2";
+const AUSD_EIP712_DOMAIN_NAME = "Agora Dollar";
+const AUSD_EIP712_DOMAIN_VERSION = "1";
 
 /**
  * Build (but do not sign) the EIP-712 typed-data payload for a

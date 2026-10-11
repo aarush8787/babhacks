@@ -61,9 +61,33 @@ on 2026-10-11:
   sepolia.basescan.org ourselves). This is the default baked into
   `config.ts`; `BPS_AUSD_ADDRESS` always overrides it.
 
+**Confirmed on-chain** (not from docs) by querying Base Sepolia directly on
+2026-10-11 via `eth_call` to `https://sepolia.base.org`:
+
+- **AUSD implements ERC-3009.** `authorizationState(address,bytes32)` answers
+  (returns `false`) rather than reverting, which is the ERC-3009 marker
+  function. `transferWithAuthorization(...)` has selector `0xe3ee160e`.
+- **`decimals()` returns 6**, confirming the atomic-unit assumption.
+- **The EIP-712 domain is `name: "Agora Dollar", version: "1"`** — obtained
+  from the contract's own ERC-5267 `eip712Domain()`, and verified by
+  recomputing the domain separator and matching the contract's
+  `DOMAIN_SEPARATOR()` output
+  `0x5a85328c8aae02b57a5bc1fb1848cb2fb9ccbdc204c554a4db199b13fed1e8bb`.
+  Note the ERC-20 `name()` returns `"AUSD"` while the EIP-712 domain name is
+  `"Agora Dollar"`; an earlier revision of `ausd.ts` assumed `"AUSD"`/`"2"`
+  and every signature it produced would have failed on-chain verification.
+- **The public facilitator `https://x402.org/facilitator` serves Base
+  Sepolia.** Its `/supported` endpoint advertises
+  `{x402Version: 2, scheme: "exact", network: "eip155:84532"}` plus a v1
+  `"base-sepolia"` entry. It does not enumerate which *assets* it will accept,
+  so AUSD acceptance specifically remains unverified until a settlement is
+  attempted.
+
 **NOT confirmed** from the pages we could fetch:
 
-- That AUSD's deployed contract actually implements ERC-3009
+- (Superseded: ERC-3009 support is now confirmed on-chain — see above. The
+  original doc-only uncertainty is retained below for provenance.)
+  That AUSD's deployed contract actually implements ERC-3009
   (`transferWithAuthorization` / `receiveWithAuthorization`). Agora's
   `developer/advanced-erc-features.md` page describes ERC-3009 gasless
   transfers as a concept, but the fetched content never states, in the same
@@ -74,13 +98,9 @@ on 2026-10-11:
   module produces will fail (revert) at facilitator-settlement time — it
   will NOT silently succeed, because `settleViaFacilitator` only reports
   `settled` on an explicit `success: true` + tx hash from the facilitator.
-- AUSD's exact EIP-712 domain `name`/`version` (`DOMAIN_SEPARATOR` inputs).
-  We use `"AUSD"` / `"2"` in `ausd.ts`, matching the convention ERC-3009
-  tokens commonly use (and mirroring the `"USDC"`/`"2"` example in x402's
-  own spec). If AUSD's real domain differs, every signature here will fail
-  EIP-712 verification on-chain. This is the single highest-risk assumption
-  in this module and is called out at its definition
-  (`AUSD_EIP712_DOMAIN_NAME` / `AUSD_EIP712_DOMAIN_VERSION` in `ausd.ts`).
+- (Superseded: the EIP-712 domain was previously unconfirmed and assumed to
+  be `"AUSD"`/`"2"`. It has since been read from the contract directly and
+  corrected to `"Agora Dollar"`/`"1"` — see "Confirmed on-chain" above.)
 
 From `https://github.com/coinbase/x402`,
 `specs/x402-specification-v1.md` (fetched directly, 2026-10-11) — **confirmed
@@ -120,14 +140,14 @@ by direct quote**:
    twice. Going to production requires a persistent idempotency store
    (e.g., a database row for the idempotency key, written atomically with
    the payout).
-2. **EIP-712 domain is assumed, not confirmed** (see above). Wrong domain
-   name/version means every signature fails on-chain verification. This
-   would surface as a `failed` result from the facilitator, not a false
-   success — but it does mean the happy path may not work against the real
-   contract until this is checked against AUSD's actual
-   `eip712Domain()`/`DOMAIN_SEPARATOR` output.
-3. **ERC-3009 support on AUSD is asserted by the hackathon brief, not
-   verified by us from docs.** See above.
+2. ~~**EIP-712 domain is assumed.**~~ RESOLVED: read from the contract's
+   `eip712Domain()` and verified against its `DOMAIN_SEPARATOR()`. See
+   "Confirmed on-chain" above.
+3. ~~**ERC-3009 support on AUSD is asserted, not verified.**~~ RESOLVED:
+   confirmed on-chain via `authorizationState`.
+3a. **Facilitator asset acceptance is still unverified.** The public
+   facilitator serves Base Sepolia but does not publish its accepted asset
+   list, so the first real settlement is the test.
 4. **No `/verify` call before `/settle`.** The x402 spec describes verify
    as a separate, cheaper pre-check. `settle.ts` goes straight to `/settle`
    for simplicity; a production integration should call `/verify` first and
