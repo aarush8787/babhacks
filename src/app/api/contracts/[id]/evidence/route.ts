@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { hashCanonical } from "@/lib/bps/canonical";
 import { evaluate } from "@/lib/bps/evaluate";
 import {
   acceptContract,
@@ -9,12 +10,11 @@ import {
   getPriorArtifactHashes,
   LifecycleError,
   NotFoundError,
+  latestVerdict,
   recordVerdict,
   submitEvidence,
 } from "@/lib/bps/store";
 import type { EvidenceBundle } from "@/lib/bps/types";
-
-export const runtime = "nodejs";
 
 const ROLES = ["worker", "pickup", "recipient", "witness"] as const;
 
@@ -84,6 +84,16 @@ export async function POST(
 
   try {
     const existing = getContract(id);
+
+    // Identical evidence replays to the stored verdict instead of 409-ing on the
+    // lifecycle guard. This is not a weakening of the state machine: the engine is
+    // deterministic, so re-evaluating the same bundle against the same policy can
+    // only ever yield the same decision. It makes the verdict endpoint idempotent
+    // and lets a reviewer re-run a scenario without resetting the contract.
+    const prior = latestVerdict(existing);
+    if (prior && prior.evidenceHash === hashCanonical(evidence)) {
+      return NextResponse.json({ verdict: prior, replayed: true }, { status: 200 });
+    }
 
     // Allow the worker's first evidence submission to double as acceptance, for
     // flows that skipped an explicit challenge round (e.g. policies with no

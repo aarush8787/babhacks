@@ -5,9 +5,15 @@
  * `evaluate()` outcomes — nothing here is mocked at the crypto layer.
  */
 import * as secp from "@noble/secp256k1";
+import { hmac } from "@noble/hashes/hmac";
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
 import { challengePayload, hashCanonical } from "./canonical";
+
+// @noble/secp256k1 v2 needs a sync HMAC-SHA256 implementation wired in before
+// `sign` (the non-async variant) can be used.
+secp.etc.hmacSha256Sync = (key: Uint8Array, ...msgs: Uint8Array[]) =>
+  hmac(sha256, key, secp.etc.concatBytes(...msgs));
 import { compileContract } from "./compile";
 import type {
   Challenge,

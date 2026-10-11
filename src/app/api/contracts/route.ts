@@ -3,14 +3,9 @@ import { z } from "zod";
 import { compileContract } from "@/lib/bps/compile";
 import { createFundedContract, listContracts } from "@/lib/bps/store";
 
-export const runtime = "nodejs";
-
 const CreateContractSchema = z.object({
   sourceText: z.string().min(1, "sourceText is required"),
-  reward: z.object({
-    amount: z.string().min(1),
-    currency: z.literal("AUSD"),
-  }),
+  reward: z.string().min(1, "reward is required"),
   deadline: z.string().min(1, "deadline is required"),
 });
 
@@ -44,7 +39,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = await compileContract(parsed.data);
+  const result = compileContract(parsed.data);
 
   if (!result.ok) {
     return NextResponse.json(

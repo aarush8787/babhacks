@@ -9,8 +9,6 @@ import {
   NotFoundError,
 } from "@/lib/bps/store";
 
-export const runtime = "nodejs";
-
 const ROLES = ["worker", "pickup", "recipient", "witness"] as const;
 
 const IssueChallengeSchema = z.object({

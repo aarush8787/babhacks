@@ -19,6 +19,7 @@ import type {
   Verdict,
 } from "./types";
 import { DEMO_SCENARIOS } from "./fixtures";
+import type { SettleContractResult } from "./payments/settle";
 
 export type ContractState =
   | "DRAFT"
@@ -31,7 +32,7 @@ export type ContractState =
   | "SETTLED";
 
 /** Settlement result, as returned verbatim by settleContract. Stored as-is. */
-export type SettlementRecord = Record<string, unknown> & { status: string };
+export type SettlementRecord = SettleContractResult;
 
 export interface LifecycleEvent {
   timestamp: string;
@@ -76,8 +77,12 @@ const ALLOWED_TRANSITIONS: Record<ContractState, ContractState[]> = {
   FUNDED: ["ACCEPTED"],
   ACCEPTED: ["SUBMITTED"],
   SUBMITTED: ["VERIFIED", "REJECTED", "REVIEW"],
-  VERIFIED: ["SETTLED"],
-  REJECTED: [],
+  // Evidence may be resubmitted until the contract settles. A rejection is not
+  // the end of the road -- a worker whose proof was incomplete can try again.
+  // SETTLED is the only truly terminal state, because that is the one where
+  // money has moved and re-running evaluation could authorize a second payout.
+  VERIFIED: ["SETTLED", "SUBMITTED"],
+  REJECTED: ["SUBMITTED"],
   REVIEW: ["SETTLED", "SUBMITTED"], // a human may re-run evaluation after review, or settle after manual override
   SETTLED: [],
 };
@@ -309,13 +314,13 @@ export function submitEvidence(
       `Evidence cannot be submitted before the contract is ACCEPTED (currently ${record.state}).`,
     );
   }
-  if (record.state === "SETTLED" || record.state === "REJECTED") {
+  if (record.state === "SETTLED") {
     throw new LifecycleError(
       "terminal_state",
-      `Contract ${contractId} is in terminal state ${record.state}; evidence can no longer be submitted.`,
+      `Contract ${contractId} has already settled; evidence can no longer be submitted.`,
     );
   }
-  if (record.state === "ACCEPTED") {
+  if (record.state !== "SUBMITTED") {
     transition(record, "SUBMITTED", `worker:${record.workerAddress ?? "unknown"}`, "Evidence submitted.");
   }
   record.evidence.push(evidence);

@@ -9,10 +9,14 @@ import {
   recordSettlement,
 } from "@/lib/bps/store";
 
-export const runtime = "nodejs";
-
 const SettleSchema = z.object({
-  idempotencyKey: z.string().min(1, "idempotencyKey is required"),
+  /**
+   * Optional. When absent, settleContract() derives the key from
+   * `${contractId}:${verdict.evidenceHash}`, which is the stronger default:
+   * it is tied to the exact evidence that was approved, so a caller cannot
+   * bypass the double-payout guard by sending a fresh random key.
+   */
+  idempotencyKey: z.string().min(1).optional(),
 });
 
 export async function POST(
@@ -21,11 +25,15 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "malformed_json", message: "Request body must be valid JSON." }, { status: 400 });
+  // An empty body is valid here -- every field is optional.
+  const raw = await req.text();
+  let body: unknown = {};
+  if (raw.trim().length > 0) {
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: "malformed_json", message: "Request body must be valid JSON." }, { status: 400 });
+    }
   }
 
   const parsed = SettleSchema.safeParse(body);
@@ -57,7 +65,7 @@ export async function POST(
 
     // Persist and return exactly what the payments layer decided. Never invent
     // or alter a txHash or any other field here.
-    const updated = recordSettlement(id, result as Record<string, unknown> & { status: string });
+    const updated = recordSettlement(id, result);
 
     return NextResponse.json({ settlement: updated.settlement, state: updated.state });
   } catch (err) {

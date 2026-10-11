@@ -132,7 +132,7 @@ function PolicyNode({
       <div className="flex flex-col gap-2 border-l border-[color:var(--border)] pl-3">
         {children.map((child, i) => (
           <PolicyNode
-            key={policy.op === "PRED" ? i : i}
+            key={i}
             policy={child}
             resultsById={resultsById}
             depth={depth + 1}

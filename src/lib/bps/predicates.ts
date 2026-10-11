@@ -151,11 +151,17 @@ const IMPLS: Record<PredicateName, PredicateImpl> = {
     const expires = Date.parse(challenge.expiresAt);
     const issued = Date.parse(challenge.issuedAt);
 
-    if (challenge.consumedAt && Date.parse(challenge.consumedAt) < signedAt) {
+    // A spent nonce is spent, full stop.
+    //
+    // An earlier version compared `consumedAt` against the receipt's `signedAt`
+    // and only flagged a replay when consumption preceded the signature. That is
+    // unsound: `signedAt` is worker-supplied, so backdating it defeated the check.
+    // Freshness must not depend on a timestamp the adversary controls.
+    if (challenge.consumedAt) {
       return {
         outcome: "FAIL",
         tier: "SELF_REPORTED",
-        reason: "nonce was already consumed before this signature — replay",
+        reason: `nonce was already consumed at ${challenge.consumedAt} — replay`,
         usedEvidence: [receipt.nonce],
       };
     }

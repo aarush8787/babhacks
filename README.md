@@ -172,6 +172,12 @@ We would rather state these than have a judge find them.
 - **Pay-after-verification, not escrow.** See the AUSD section above.
 - **Counterparty identity is not pinned.** `distinct_signers` proves two
   different keys signed, not that either belongs to the intended person.
+- **Demo scenario order affects the rejection *reason*.** Three delivery
+  scenarios share one contract (the signatures bind the contract id, so they
+  cannot be split without re-signing). Running the valid one first consumes its
+  nonces, so the forged attempt then fails on nonce freshness rather than on
+  `distinct_signers`. It is still correctly rejected either way; run the forged
+  scenario first to see it fail on signer independence specifically.
 - **No worker mobile capture flow.** Evidence is submitted through the API and
   the demo scenarios rather than a camera-and-GPS PWA.
 

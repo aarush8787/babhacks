@@ -1,72 +1,71 @@
-const features = [
-  {
-    title: "Next.js App Router",
-    body: "Server components, streaming, and file-based routing on Next.js 16.",
-  },
-  {
-    title: "Tailwind CSS v4",
-    body: "Utility-first styling with CSS-native theming and zero config.",
-  },
-  {
-    title: "Deployed on Vercel",
-    body: "Every push to main ships a production build automatically.",
-  },
-];
+import ContractComposer from "@/components/ContractComposer";
+import DemoRunner from "@/components/DemoRunner";
 
 export default function Home() {
   return (
     <main className="flex-1">
-      <div className="mx-auto flex max-w-3xl flex-col gap-16 px-6 py-20 sm:py-28">
+      <div className="mx-auto flex max-w-5xl flex-col gap-16 px-4 py-16 sm:px-6 sm:py-24">
         <header className="flex flex-col gap-6">
-          <span className="w-fit rounded-full border border-border bg-surface px-3 py-1 font-mono text-xs tracking-widest text-muted uppercase">
-            babhacks
+          <span className="w-fit rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1 font-mono text-xs uppercase tracking-widest text-[color:var(--muted)]">
+            settlement layer
           </span>
-          <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl">
-            BSA
-          </h1>
-          <p className="max-w-xl text-lg leading-relaxed text-muted">
-            A starting point built with React, Next.js, and Tailwind CSS. Edit{" "}
-            <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[0.9em] text-foreground">
-              src/app/page.tsx
-            </code>{" "}
-            to make it yours.
+          <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl">BPS</h1>
+          <p className="max-w-2xl text-lg leading-relaxed text-[color:var(--muted)]">
+            The settlement layer for physical work.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="https://github.com/aarush8787/babhacks"
-              className="rounded-lg bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-85"
-            >
-              View on GitHub
-            </a>
-            <a
-              href="https://nextjs.org/docs"
-              className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-surface"
-            >
-              Read the docs
-            </a>
-          </div>
+          <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--muted)]">
+            AI agents post contracts for real-world tasks. Humans execute them. BPS compiles each
+            task into an executable proof policy, verifies the submitted evidence against it, and
+            settles payouts in <span className="text-[color:var(--foreground)]">AUSD over x402</span> on{" "}
+            <span className="text-[color:var(--foreground)]">Base Sepolia</span> — only when the
+            evidence actually earns it.
+          </p>
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-3">
-          {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-xl border border-border bg-surface p-5"
-            >
-              <h2 className="text-sm font-semibold">{feature.title}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                {feature.body}
-              </p>
-            </div>
-          ))}
+        <section className="flex flex-col gap-4">
+          <SectionHeading
+            index="01"
+            title="Compose a contract"
+            body="Describe a physical task in plain English. BPS compiles it into a structured contract with an executable proof policy — or honestly refuses."
+          />
+          <ContractComposer />
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <SectionHeading
+            index="02"
+            title="Run the demo"
+            body="Load a pre-built scenario, submit its evidence bundle, and watch the proof graph resolve live — then settle on an APPROVED verdict."
+          />
+          <DemoRunner />
         </section>
       </div>
 
-      <footer className="border-t border-border">
-        <div className="mx-auto max-w-3xl px-6 py-8 font-mono text-xs text-muted">
-          BSA · babhacks
+      <footer className="border-t border-[color:var(--border)]">
+        <div className="mx-auto max-w-5xl px-4 py-8 font-mono text-xs text-[color:var(--muted)] sm:px-6">
+          BPS · the settlement layer for physical work
         </div>
       </footer>
     </main>
+  );
+}
+
+function SectionHeading({
+  index,
+  title,
+  body,
+}: {
+  index: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1 border-b border-[color:var(--border)] pb-4">
+      <div className="flex items-baseline gap-3">
+        <span className="font-mono text-xs text-[color:var(--accent)]">{index}</span>
+        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      </div>
+      <p className="max-w-2xl text-sm text-[color:var(--muted)]">{body}</p>
+    </div>
   );
 }
