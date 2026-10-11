@@ -1,12 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
-  --muted: #5b5b66;
-  --border: #e5e5ea;
-  --accent: #4f46e5;
-  --surface: #f7f7f9;
+  --background: #07070a;
+  --foreground: #f4f4f6;
+  --muted: #8d8d99;
+  --muted-2: #5f5f6b;
+  --border: #1d1d23;
+  --border-strong: #2d2d36;
+  --accent: #6ee7b7;
+  --accent-dim: #2d4d41;
+  --surface: #0f0f13;
+  --surface-raised: #15151a;
+  --danger: #f28b82;
+  --warning: #e8c468;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-surface: var(--surface);
 }
 
 @theme inline {
@@ -20,17 +33,47 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #fafafa;
-    --muted: #a1a1aa;
-    --border: #27272a;
-    --accent: #818cf8;
-    --surface: #121215;
-  }
+* {
+  border-color: var(--border);
 }
 
 body {
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@keyframes bps-fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bps-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.bps-pending {
+  animation: bps-pulse 1.4s ease-in-out infinite;
+}
+
+.bps-resolve {
+  animation: bps-fade-up 0.35s ease-out;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--foreground);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
