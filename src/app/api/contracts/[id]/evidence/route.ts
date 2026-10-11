@@ -41,11 +41,23 @@ const AiAssertionSchema = z.object({
   over: z.array(z.string()),
 });
 
+/**
+ * The worker identifier doubles as the AUSD payout destination, so it must be a
+ * well-formed EVM address.
+ *
+ * Validated here, at the point evidence enters the system, rather than at
+ * settlement: a worker who has already done the job should not discover their
+ * identifier was unpayable only after the verdict lands.
+ */
+const EvmAddressSchema = z
+  .string()
+  .regex(/^0x[0-9a-fA-F]{40}$/, "workerId must be a 20-byte hex EVM address (the AUSD payout destination)");
+
 const EvidenceBundleSchema = z.object({
   // contractId is taken from the URL, not trusted from the body.
   contractId: z.string().optional(),
   policyHash: z.string().min(1),
-  workerId: z.string().min(1),
+  workerId: EvmAddressSchema,
   submittedAt: z.string().min(1),
   receipts: z.array(SignedReceiptSchema),
   geo: z.array(GeoPointSchema),
