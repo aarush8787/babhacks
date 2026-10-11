@@ -92,7 +92,7 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const auth = await requireAuth(req, "worker");
+  const auth = await requireAuth(req, "worker", { allowPublicDemo: true });
   if (!auth.ok) return auth.response;
 
   let body: unknown;

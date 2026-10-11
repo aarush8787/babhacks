@@ -122,12 +122,34 @@ const FORBIDDEN = () => jsonResponse(403, { error: "forbidden" });
  * for a valid credential whose role doesn't satisfy what's required) --
  * `admin` always satisfies any required role.
  */
+/**
+ * Whether this deployment runs an open, clickable public demo.
+ *
+ * A real deployment leaves this unset and every mutating route needs a key.
+ * A demo deployment sets BPS_PUBLIC_DEMO=1, which relaxes the *non-financial*
+ * routes so a judge can drive the UI from a browser. It deliberately does NOT
+ * relax settlement: the relaxation is opt-in per route via
+ * `requireAuth(req, role, { allowPublicDemo: true })`, and the settle route
+ * never passes it.
+ */
+export function publicDemoEnabled(): boolean {
+  return process.env.BPS_PUBLIC_DEMO === "1";
+}
+
 export async function requireAuth(
   req: Request,
   role: Role,
+  opts: { allowPublicDemo?: boolean } = {},
 ): Promise<{ ok: true; principal: string } | { ok: false; response: Response }> {
   if (authMode() === "open") {
     return { ok: true, principal: "anonymous:open-mode" };
+  }
+
+  // Public-demo relaxation, available only to routes that opted in. Money never
+  // moves through one of those, so an unauthenticated caller can exercise the
+  // proof engine but cannot cause a payout.
+  if (opts.allowPublicDemo && publicDemoEnabled()) {
+    return { ok: true, principal: "anonymous:public-demo" };
   }
 
   const header = req.headers.get("authorization");

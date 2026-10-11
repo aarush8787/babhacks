@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuth(req, "agent");
+  const auth = await requireAuth(req, "agent", { allowPublicDemo: true });
   if (!auth.ok) return auth.response;
 
   let body: unknown;
